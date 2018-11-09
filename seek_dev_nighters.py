@@ -5,39 +5,38 @@ from datetime import datetime
 
 def get_api_data(url, parameters=None):
     error = None
-    init_page_data = None
+    api_data = None
     try:
-        init_page_data = requests.get(
+        api_data = requests.get(
             url, params=parameters,
             timeout=10).json()
     except requests.exceptions.Timeout:
         error = "Connection timed out"
     except requests.exceptions.HTTPError:
-        error = "Status code - " + init_page_data.status_code + " received"
+        error = "Status code - {} received".format(api_data.status_code)
     except requests.exceptions.ConnectionError:
         error = "Could not connect to API"
     except ValueError:
         error = "Can not decode JSON-data"
-    return init_page_data, error
+    return api_data, error
 
 
 def load_users_from_pages():
     base_url = "https://devman.org/api/challenges/solution_attempts/"
-    json_data, error = get_api_data(base_url)
-    if error is not None:
-        raise ValueError(error)
-    page_count = json_data["number_of_pages"]
-    for page in range(1, page_count+1):
-        json_data, error = get_api_data(base_url, {"page": page})
+    page = 1
+    while True:
+        api_data, error = get_api_data(base_url, {"page": page})
         if error is not None:
-            print("Error: \"{}\" occurred on page {}".format(error, page))
-            continue
-        for record in json_data.get("records"):
+            print("Error: '{}' occurred on page {}".format(error, page))
+            break
+        for record in api_data.get("records"):
             yield record
-    return None
+        page += 1
+        if page > api_data.get("number_of_pages"):
+            break
 
 
-def get_midnighters(*users):
+def get_midnighters(users):
     midnighters = []
     for user in users:
         if check_user(user):
@@ -62,9 +61,9 @@ def is_midnighter(user_time):
 
 if __name__ == "__main__":
     print("Searching midnighters...")
-    if load_users_from_pages():
-        print("Midnighters:")
-        for midnighter in get_midnighters(*load_users_from_pages()):
-            print(midnighter)
-    else:
-        print("Could not get midnighters")
+    is_any_midnighter_exist = False
+    for midnighter in get_midnighters(load_users_from_pages()):
+        is_any_midnighter_exist = True
+        print("got midnighter: {}".format(midnighter))
+    if not is_any_midnighter_exist:
+        print("No midnighters found")
